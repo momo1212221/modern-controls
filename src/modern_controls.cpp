@@ -419,12 +419,11 @@ void follow(uint32_t camera) {
     const auto up = kbm::unit_or(read<V>(block + KBM_CAMERAS_UP), kbm::kWorldUp);
     auto orbit = read<V>(state + KBM_FOLLOW_ORBIT);
     auto smooth = read<V>(state + KBM_FOLLOW_ORBIT_SMOOTH);
-    auto target = read<V>(state + KBM_FOLLOW_TARGET);
-    auto eye = kbm::minus(read<V>(state + KBM_FOLLOW_EYE), target);
+    // KBM_FOLLOW_EYE is the previous collision-resolved camera position. Leave it to the
+    // game's collision solver; changing it here can make the next trace start behind geometry.
     if (!(locks & 1) && yaw != 0) {
         orbit = kbm::rotate(orbit, up, yaw);
         smooth = kbm::rotate(smooth, up, yaw);
-        eye = kbm::rotate(eye, up, yaw);
     }
     if (locks & 2) {
         g->held = false;
@@ -442,13 +441,11 @@ void follow(uint32_t camera) {
         };
         orbit = tilt(orbit);
         smooth = tilt(smooth);
-        eye = tilt(eye);
         g->tilt = now;
         g->held = true;
     }
     write(state + KBM_FOLLOW_ORBIT, orbit);
     write(state + KBM_FOLLOW_ORBIT_SMOOTH, smooth);
-    write(state + KBM_FOLLOW_EYE, kbm::plus(target, eye));
     if (g->held) {
         float w = kbm::follow_target_of(g->tilt);
         write(state + KBM_FOLLOW_TILT, w);
@@ -623,7 +620,7 @@ void load(openrac::Mod& mod) {
     });
 }
 }  // namespace
-OPENRAC_MOD_CPP("modern-controls", "0.3.2", load)
+OPENRAC_MOD_CPP("modern-controls", "0.3.3", load)
 
 extern "C" OPENRAC_MOD_EXPORT void openrac_mod_unload() {
     if (g) {

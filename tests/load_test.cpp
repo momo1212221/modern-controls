@@ -205,6 +205,7 @@ int main(int argc, char** argv) {
             at<V>(state + 0x130) = {4, 0, 0};
             at<V>(state + 0x140) = {4, 0, 0};
             at<V>(state) = {4, 0, 0};
+            const V resolved_eye = at<V>(state);
             uint8_t report[6] = {255, 255, 255, 128, 128, 128};
             input.tick = 1;
             pad(pad_user, 0, report, 6);
@@ -216,6 +217,8 @@ int main(int argc, char** argv) {
                 < .0001f
             );
             CHECK(report[4] == 128 && report[5] == 128);
+            CHECK(at<V>(state).x == resolved_eye.x && at<V>(state).y == resolved_eye.y
+                  && at<V>(state).z == resolved_eye.z);
             CHECK(
                 std::abs(
                     at<V>(state + 0x130).x * at<V>(state + 0x130).x

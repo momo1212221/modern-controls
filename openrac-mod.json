@@ -2,7 +2,7 @@
   "format": 2,
   "id": "modern-controls",
   "name": "Modern Controls",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "author": "mo",
   "description": "Direct mouse and controller camera with adjustable turn and aim speed, separate axis sensitivity, radial deadzone, movement speed, and acceleration/braking.",
   "license": "GPL-3.0-or-later",
