@@ -1,0 +1,130 @@
+{
+  "format": 2,
+  "id": "modern-controls",
+  "name": "Modern Controls",
+  "version": "0.3.0",
+  "author": "mo",
+  "description": "Direct mouse and controller camera with adjustable turn and aim speed, separate axis sensitivity, radial deadzone, movement speed, and acceleration/braking.",
+  "license": "GPL-3.0-or-later",
+  "api": "1.9",
+  "games": {
+    "rac1": [
+      "pal",
+      "ntsc"
+    ]
+  },
+  "hooks": [
+    "rac1.camera.follow.apply_overrides",
+    "rac1.player.approach_speed"
+  ],
+  "settings": [
+    {
+      "key": "enabled",
+      "name": "Modern controls",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "mouse_enabled",
+      "name": "Mouse / gyro / trackpad camera",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "mouse_x",
+      "name": "Mouse horizontal sensitivity (%)",
+      "type": "int",
+      "default": 150,
+      "min": 10,
+      "max": 1000,
+      "step": 10
+    },
+    {
+      "key": "mouse_y",
+      "name": "Mouse vertical sensitivity (%)",
+      "type": "int",
+      "default": 150,
+      "min": 10,
+      "max": 1000,
+      "step": 10
+    },
+    {
+      "key": "stick_x",
+      "name": "Controller horizontal base speed (degrees / second)",
+      "type": "int",
+      "default": 240,
+      "min": 30,
+      "max": 720,
+      "step": 10
+    },
+    {
+      "key": "stick_y",
+      "name": "Controller vertical base speed (degrees / second)",
+      "type": "int",
+      "default": 150,
+      "min": 30,
+      "max": 360,
+      "step": 10
+    },
+    {
+      "key": "controller_level",
+      "name": "Controller camera fine adjustment (1-100)",
+      "type": "int",
+      "default": 50,
+      "min": 1,
+      "max": 100,
+      "step": 1,
+      "description": "50 is normal, 75 twice and 100 three times the base axis speed. Also adjustable live under Pause > Options > Controls; saved in-game adjustment takes precedence."
+    },
+    {
+      "key": "aim_speed",
+      "name": "Controller first-person aiming speed (%)",
+      "type": "int",
+      "default": 75,
+      "min": 25,
+      "max": 200,
+      "step": 25,
+      "description": "Additional right-stick multiplier while aiming in first person."
+    },
+    {
+      "key": "deadzone",
+      "name": "Right stick deadzone (%)",
+      "type": "int",
+      "default": 10,
+      "min": 0,
+      "max": 40,
+      "step": 1
+    },
+    {
+      "key": "invert_y",
+      "name": "Invert vertical look",
+      "type": "bool",
+      "default": false
+    },
+    {
+      "key": "response",
+      "name": "Movement acceleration and braking (%)",
+      "type": "int",
+      "default": 175,
+      "min": 100,
+      "max": 300,
+      "step": 25
+    },
+    {
+      "key": "move_speed",
+      "name": "Movement speed (%)",
+      "type": "int",
+      "default": 100,
+      "min": 50,
+      "max": 200,
+      "step": 10,
+      "description": "On-foot target speed, independent of camera speed and acceleration. 100% preserves the original run speed."
+    }
+  ],
+  "conflicts": [
+    {
+      "id": "keyboard-mouse",
+      "reason": "Both mods control the mouse camera."
+    }
+  ]
+}
