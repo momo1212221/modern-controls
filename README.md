@@ -2,7 +2,7 @@
 
 A separate RAC1 PAL / NTSC-U mod for a quicker, more adjustable camera and movement response.
 
-The mod integrates directly into **Pause → Options → Camera / Kamera**. The separate **Controls** entry is removed. The native left/right and up/down inversion rows stay in Camera, while the original Slow/Medium/Fast **camera rotation speed** row is replaced by the Modern Controls **1–100** adjustment. Use Left/Right for exact one-step changes; the bar shows the current number. Changes affect the next gameplay input tick and are saved for the next launch.
+The mod integrates directly into **Pause → Options → Kamera**. There is only one camera entry: the original RAC1 Kamera page is removed and replaced by the Modern Controls page. The replacement Kamera page keeps the two inversion controls and replaces the original Slow/Medium/Fast **camera rotation speed** row with the Modern Controls **1–100** adjustment. Use Left/Right for exact one-step changes; the bar shows the current number. Changes affect the next gameplay input tick and are saved for the next launch.
 
 The remaining settings are under **Launcher → Mods → Modern Controls → Settings** and take effect after a game restart.
 
@@ -33,7 +33,7 @@ The in-game camera slider takes effect immediately. Changes to other launcher se
 
 Keep the Steam Deck Pack enabled for its icons, but switch **Gyro / trackpad mouse camera** off in that pack. Modern Controls becomes the one mouse-camera provider. Its own mouse setting can be disabled for a stick-only setup. Do not combine it with Keyboard & Mouse; both control the camera.
 
-The Camera integration uses one native pause Options slot internally. OpenRAC currently permits two slots across all mods. If both are already occupied, Modern Controls leaves the original Camera page in place and logs a warning; free a slot to expose the integrated 1–100 camera control. With Multiplayer and the old Steam Deck mouse-only pack, disable that already-unused mouse pack and keep the separate icon mod. A current Steam Deck Pack can stay enabled if a slot is free; its own mouse camera must remain off.
+The Camera integration uses one native pause Options slot internally. The local OpenRAC build permits four slots across all mods. If all four are already occupied, Modern Controls leaves the original Camera page in place and logs a warning; free a slot to expose the integrated 1–100 camera control. With Multiplayer and the old Steam Deck mouse-only pack, disable that already-unused mouse pack and keep the separate icon mod. A current Steam Deck Pack can stay enabled if a slot is free; its own mouse camera must remain off.
 
 The fine adjustment is saved in `controls.ini` in the SDK's per-mod data directory on interface 1.11+, or beside this library on older runtimes (including 1.10). Only this mod's own preference is written. A read-only mod directory still allows live adjustment, but the page reports when it cannot save. The saved in-game camera level takes precedence over the launcher default; remove that file to use the launcher's level again. Existing 0.2.0 launcher camera percentages should be migrated to the closest new level (100% → 50, 200% → 75, 300% → 100).
 

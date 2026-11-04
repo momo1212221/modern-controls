@@ -192,7 +192,7 @@ int main(int argc, char** argv) {
                 return 0;
             };
             api.ui_pause_item = [](openrac_mod*, const char* label, int) {
-                CHECK(std::string(label) == "Camera" || std::string(label) == "Kamera");
+                CHECK(std::string(label) == "Kamera");
                 return reject_pause ? OPENRAC_HOOK_UNKNOWN : 0;
             };
             CHECK(load(&api, reinterpret_cast<openrac_mod*>(1)) == 0);

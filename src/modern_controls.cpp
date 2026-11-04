@@ -239,9 +239,11 @@ void add_camera_page(openrac::Mod& mod) {
     });
     show_camera();
     try {
-        mod.ui_pause_item(words("Camera", "Caméra", "Kamera", "Cámara", "Telecamera"), g->page);
+        // Keep exactly one visible camera entry in the German PAL menu. The native RAC1 Kamera
+        // entry is removed below and this page takes its place with the 1-100 control.
+        mod.ui_pause_item("Kamera", g->page);
     } catch (const openrac::Error&) {
-        // The original Camera page stays available when both mod Options slots are occupied.
+        // The original Camera page stays available only when all pause Options slots are occupied.
         mod.warn(
             "Camera Options integration unavailable: free a pause Options slot; launcher adjustment "
             "still works"
@@ -253,14 +255,16 @@ void add_camera_page(openrac::Mod& mod) {
 // OpenRAC builds the level Options list in its guest-static region. It must keep the game's Camera
 // item while constructing the mod pages because that page is their native template. Once the list
 // exists, remove only that original Camera item: our mod page then occupies Camera's role without a
-// duplicate Controls/Camera entry. The companion hint and picture arrays are shifted by the same
+// duplicate Camera/Kamera entry. The companion hint and picture arrays are shifted by the same
 // one item so Subtitles and Quit keep their own description and picture.
 constexpr uint32_t kPortStatics = 0xE0200000u;
 constexpr uint32_t kPortStaticsEnd = 0xE0300000u;
 constexpr uint32_t kMenuItemBytes = 0xCu;
 
+constexpr int kPauseModMax = 4;
+
 bool pause_mod_text(uint16_t text) {
-    return text == 0x7D00u || text == 0x7D01u;
+    return text >= 0x7D00u && text < 0x7D00u + kPauseModMax;
 }
 
 bool plausible_picture(uint32_t at) {
@@ -325,15 +329,17 @@ void integrate_camera_menu() {
             patch_aux(patch);
         }
     }
-    // The generated list is unique here: Sound, Video, one or two mod items, Camera, Subtitles,
+    // The generated list is unique here: Sound, Video, up to four mod items, Camera, Subtitles,
     // Quit, end. Scan only the port's 1 MiB guest-static arena, not the game's data.
-    for (uint32_t sound = kPortStatics; sound + 8 * kMenuItemBytes < kPortStaticsEnd; sound += 4) {
+    for (uint32_t sound = kPortStatics;
+         sound + static_cast<uint32_t>(kPauseModMax + 5) * kMenuItemBytes < kPortStaticsEnd;
+         sound += 4) {
         if (read<uint16_t>(sound) != 0x4F22u || read<uint16_t>(sound + kMenuItemBytes) != 0x7E08u) {
             continue;
         }
         uint32_t camera = sound + 2 * kMenuItemBytes;
         int mods = 0;
-        while (mods < 2 && pause_mod_text(read<uint16_t>(camera))) {
+        while (mods < kPauseModMax && pause_mod_text(read<uint16_t>(camera))) {
             ++mods;
             camera += kMenuItemBytes;
         }
@@ -362,6 +368,10 @@ void integrate_camera_menu() {
         }
         g->menu_patches.push_back({items, 1 + mods, false, false});
         patch_aux(g->menu_patches.back());
+        g->mod->info(
+            "Modern Controls: native Kamera entry replaced by 1-100 page ("
+            + std::to_string(mods) + " mod entries present)"
+        );
     }
 }
 
@@ -613,7 +623,7 @@ void load(openrac::Mod& mod) {
     });
 }
 }  // namespace
-OPENRAC_MOD_CPP("modern-controls", "0.3.1", load)
+OPENRAC_MOD_CPP("modern-controls", "0.3.2", load)
 
 extern "C" OPENRAC_MOD_EXPORT void openrac_mod_unload() {
     if (g) {
