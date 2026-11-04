@@ -182,15 +182,17 @@ int main(int argc, char** argv) {
                 return 0;
             };
             api.ui_set = [](openrac_mod*, int, const openrac_ui_content* c) {
-                CHECK(c->item_count == 2);
-                CHECK(c->items[0].choice_count == 3);
-                CHECK(c->items[0].choice == 1);
+                CHECK(c->item_count == 3);
+                CHECK(c->items[0].choice_count == 2);
+                CHECK(c->items[1].choice_count == 2);
+                CHECK(c->items[2].choice_count == 3);
+                CHECK(c->items[2].choice == 1);
                 title = c->title;
-                shown = c->items[0].choices[1];
+                shown = c->items[2].choices[1];
                 return 0;
             };
             api.ui_pause_item = [](openrac_mod*, const char* label, int) {
-                CHECK(std::string(label) == "Controls");
+                CHECK(std::string(label) == "Camera" || std::string(label) == "Kamera");
                 return reject_pause ? OPENRAC_HOOK_UNKNOWN : 0;
             };
             CHECK(load(&api, reinterpret_cast<openrac_mod*>(1)) == 0);
@@ -332,9 +334,9 @@ int main(int argc, char** argv) {
             // Native settings: real 1..100 positions through three moving choices.
             at<int32_t>((pal ? 0x15EE88 : 0x15ED88) + 0x1000) = 3;
             ui_event(OPENRAC_UI_SHOW);
-            CHECK(title == "Steuerung");
+            CHECK(title == "Kamera");
             CHECK(shown.find("75/100") != std::string::npos);
-            ui_event(OPENRAC_UI_CHANGE, 0, 2);
+            ui_event(OPENRAC_UI_CHANGE, 2, 2);
             CHECK(shown.find("76/100") != std::string::npos);
             input.mouse_dy = 0;
             input.mouse_dx = 0;
@@ -347,16 +349,19 @@ int main(int argc, char** argv) {
                 < .0001f
             );
             for (int n = 0; n < 110; ++n) {
-                ui_event(OPENRAC_UI_CHANGE, 0, 2);
+                ui_event(OPENRAC_UI_CHANGE, 2, 2);
             }
             CHECK(shown.find("100/100") != std::string::npos);
             for (int n = 0; n < 110; ++n) {
-                ui_event(OPENRAC_UI_CHANGE, 0, 0);
+                ui_event(OPENRAC_UI_CHANGE, 2, 0);
             }
             CHECK(shown.find("1/100") != std::string::npos);
-            ui_event(OPENRAC_UI_CHOOSE, 1);
+            // No separate Reset row: speed lives directly in the native Camera page.
+            for (int n = 0; n < 49; ++n) {
+                ui_event(OPENRAC_UI_CHANGE, 2, 2);
+            }
             CHECK(shown.find("50/100") != std::string::npos);
-            ui_event(OPENRAC_UI_CHANGE, 0, 2);
+            ui_event(OPENRAC_UI_CHANGE, 2, 2);
             CHECK(shown.find("51/100") != std::string::npos);
             unload();
             // On interface 1.10 the saved file beside the library survives a reload.

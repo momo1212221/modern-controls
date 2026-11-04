@@ -2,7 +2,7 @@
   "format": 2,
   "id": "modern-controls",
   "name": "Modern Controls",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "author": "mo",
   "description": "Direct mouse and controller camera with adjustable turn and aim speed, separate axis sensitivity, radial deadzone, movement speed, and acceleration/braking.",
   "license": "GPL-3.0-or-later",
@@ -74,7 +74,7 @@
       "min": 1,
       "max": 100,
       "step": 1,
-      "description": "50 is normal, 75 twice and 100 three times the base axis speed. Also adjustable live under Pause > Options > Controls; saved in-game adjustment takes precedence."
+      "description": "50 is normal, 75 twice and 100 three times the base axis speed. Adjustable live under Pause > Options > Camera/Kamera, replacing the original three-step camera rotation speed row; saved in-game adjustment takes precedence."
     },
     {
       "key": "aim_speed",
@@ -94,12 +94,6 @@
       "min": 0,
       "max": 40,
       "step": 1
-    },
-    {
-      "key": "invert_y",
-      "name": "Invert vertical look",
-      "type": "bool",
-      "default": false
     },
     {
       "key": "response",
