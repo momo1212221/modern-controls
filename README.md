@@ -21,6 +21,36 @@ Mouse, Steam Input gyro-to-mouse and trackpad-to-mouse turn the camera directly,
 
 The follow camera keeps its pitch when the stick or mouse stops, and its original camera-volume locks and pitch limits still apply. First-person aiming is also direct. Other camera modes, menus, cutscenes and the Triangle weapon ring keep the game's controls. The left stick retains its analog movement input. Movement speed independently scales the on-foot target speed; 100% keeps the original maximum run speed. Acceleration and braking have their own multiplier. Vehicle controls are unchanged. Jump and animation speeds are not scaled directly. Set movement response to 100% to retain the original acceleration/braking. Disable Modern Controls to return entirely to the game's controls.
 
+## PC layout
+
+Version 0.4 adds a complete desktop layout directly to Modern Controls. It takes over OpenRAC's
+fixed keyboard mapping while leaving a connected gamepad active at the same time.
+
+| Action | Default PC input |
+| --- | --- |
+| Move | W A S D |
+| Camera | Mouse |
+| Jump | Space |
+| Fire | Left mouse |
+| Quick Select | Hold right mouse and point with the mouse |
+| Wrench | F or middle mouse |
+| Crouch | Left Ctrl or C |
+| Strafe | Left Shift |
+| First-person view | V or Mouse 4 |
+| Map | Tab or M |
+| Camera behind Ratchet | Q |
+| Pause / back | Escape or P |
+| Quick Select slots | 1 to 8 |
+| Next / previous weapon | Wheel down / up |
+
+Enable or disable it with **PC control layout** in the mod settings. Keyboard/mouse and the physical
+controller are merged into the same pad report, so switching between them does not require a restart.
+
+**Pause → Options → Camera → PC control layout** opens a native in-game page that shows the desktop
+layout with Ratchet & Clank's own menu frame, font and cursor. It is not a separate debug/mod overlay.
+Do not enable the separate Keyboard and Mouse mod at the same time, because both mods would own the
+same keyboard/mouse actions.
+
 ## Controllers
 
 Works with Xbox, PlayStation, Steam Deck and other gamepads that OpenRAC maps to its pad input; it does not depend on controller branding. **Controller camera fine adjustment (1–100)** is the main right-stick speed control. 1 gives 25% of the base rate, 50 gives 100%, 75 gives 200% and 100 gives 300%; all intermediate levels are distinct. **Controller first-person aiming speed (%)** is an additional multiplier for precision while aiming. For example, level 75 camera (200%) and 75% aiming gives 150% of the base speed in first person. These sliders leave mouse/gyro/trackpad sensitivity unchanged. Aiming affects the first-person camera, not every weapon's third-person fire mode.
