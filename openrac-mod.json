@@ -2,9 +2,9 @@
   "format": 2,
   "id": "modern-controls",
   "name": "Modern Controls",
-  "version": "0.3.3",
+  "version": "0.4.0",
   "author": "Moritz Wallinger",
-  "description": "Direct mouse and controller camera with adjustable turn and aim speed, separate axis sensitivity, radial deadzone, movement speed, and acceleration/braking.",
+  "description": "Modern PC and controller controls for RAC1: WASD/mouse layout, direct mouse camera, keyboard weapon hotkeys, adjustable controller camera/aim speed, movement speed, radial deadzone, and a native in-game PC control layout.",
   "license": "GPL-3.0-or-later",
   "api": "1.9",
   "games": {
@@ -23,6 +23,13 @@
       "name": "Modern controls",
       "type": "bool",
       "default": true
+    },
+    {
+      "key": "pc_layout",
+      "name": "PC control layout",
+      "type": "bool",
+      "default": true,
+      "description": "Uses the built-in Modern Controls PC layout: WASD movement, mouse camera, Space jump, left click fire, right click Quick Select, F wrench, Ctrl/C crouch, Shift strafe, V first-person, Tab/M map, 1-8 and wheel for weapons, Esc/P pause. Gamepad remains active."
     },
     {
       "key": "mouse_enabled",
@@ -118,7 +125,7 @@
   "conflicts": [
     {
       "id": "keyboard-mouse",
-      "reason": "Both mods control the mouse camera."
+      "reason": "Modern Controls now provides its own PC keyboard/mouse layout and camera controls."
     }
   ]
 }
