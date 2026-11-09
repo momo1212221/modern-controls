@@ -458,8 +458,13 @@ bool pc_action(const openrac_input& in, kbm::Context context, kbm::Action action
         if (bind == 0) {
             continue;
         }
-        if (kbm::is_mouse(bind) && context == kbm::Context::Play && !in.captured) {
-            continue;
+        if (kbm::is_mouse(bind)) {
+            if (context == kbm::Context::Play && !in.captured) {
+                continue;
+            }
+            if (context != kbm::Context::Play && !in.pointer_inside) {
+                continue;
+            }
         }
         if (pressed ? openrac_bind_pressed(&in, bind)
                     : (openrac_bind_held(&in, bind) || openrac_bind_pressed(&in, bind))) {
@@ -649,11 +654,11 @@ void pad(int port, uint8_t* report, int size) {
     if (port != 0 || !report || size < 6) {
         return;
     }
-    const auto& in = g->mod->input().raw();
     g->active = playing();
     if (g->mouse_enabled || g->pc_layout) {
         g->mod->capture_mouse(g->active);
     }
+    const auto& in = g->mod->input().raw();
     pc_layout_pad(report, size, in);
     if (!g->active) {
         g->held = false;
@@ -773,9 +778,9 @@ void load(openrac::Mod& mod) {
     g->aim_speed = setting("aim_speed", 25, 200);
     g->move_speed = setting("move_speed", 50, 200);
     add_camera_page(mod);
-    if (g->pc_layout) {
+    if (g->enabled && g->pc_layout) {
         mod.take_input(OPENRAC_INPUT_KEYBOARD | OPENRAC_INPUT_MOUSE);
-    } else if (g->mouse_enabled) {
+    } else if (g->enabled && g->mouse_enabled) {
         mod.take_input(OPENRAC_INPUT_MOUSE);
     }
     mod.on_pad(pad);
