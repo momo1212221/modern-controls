@@ -26,12 +26,19 @@ using V = kbm::Vec3;
 struct State {
     openrac::Mod* mod;
     const kbm_disc* disc;
-    bool enabled, mouse_enabled, pal;
+    bool enabled, mouse_enabled, pc_layout, pal;
     int mx, my, sx, sy, deadzone, response, controller_level, aim_speed, move_speed;
     bool active = false, held = false, seen = false;
     uint32_t tick = 0;
     float yaw = 0, pitch = 0, tilt = 0;
-    openrac::UiPage page;
+    openrac::UiPage page, pc_page;
+    kbm::Bindings pc_binds;
+    kbm::KeyStick pc_move;
+    kbm::RingPointer pc_ring;
+    kbm::Latch pc_latch;
+    kbm::Virtual pc_pad;
+    uint32_t pc_tick = UINT32_MAX;
+    bool pc_ring_open = false;
     std::filesystem::path preferences;
     bool save_failed = false;
     uint32_t invert_lr = 0, invert_ud = 0;
@@ -141,7 +148,10 @@ void show_camera() {
             ),
             {modern::bar(level - 1), modern::bar(level), modern::bar(level + 1)},
             1
-        )
+        ),
+        openrac::UiItem::button(words(
+            "PC control layout", "Commandes PC", "PC-Steuerung", "Controles de PC", "Comandi PC"
+        ))
     };
     if (g->save_failed) {
         content.footer = {words(
@@ -153,6 +163,33 @@ void show_camera() {
         )};
     }
     g->page.set(content);
+}
+
+void show_pc_layout() {
+    openrac::UiContent content;
+    content.title = words(
+        "PC Controls", "Commandes PC", "PC-Steuerung", "Controles de PC", "Comandi PC"
+    );
+    content.items = {
+        openrac::UiItem::text(words("Move        W A S D", "Déplacer     W A S D", "Bewegen      W A S D", "Mover        W A S D", "Movimento    W A S D")),
+        openrac::UiItem::text(words("Camera      Mouse", "Caméra       Souris", "Kamera       Maus", "Cámara       Ratón", "Telecamera   Mouse")),
+        openrac::UiItem::text(words("Jump        Space", "Sauter       Espace", "Springen     Leertaste", "Saltar       Espacio", "Salta        Spazio")),
+        openrac::UiItem::text(words("Fire        Left Mouse", "Tirer        Clic gauche", "Feuern       Linke Maus", "Disparar     Clic izq.", "Fuoco        Mouse sin.")),
+        openrac::UiItem::text(words("Quick Select Right Mouse", "Sélection    Clic droit", "Schnellausw. Rechte Maus", "Selección    Clic der.", "Selezione    Mouse dest.")),
+        openrac::UiItem::text(words("Wrench      F / Middle Mouse", "Clé          F / Clic milieu", "Schlüssel    F / Mittlere Maus", "Llave        F / Clic central", "Chiave       F / Mouse centro")),
+        openrac::UiItem::text(words("Crouch      Ctrl / C", "Accroupir    Ctrl / C", "Ducken       Strg / C", "Agacharse    Ctrl / C", "Accovaccia   Ctrl / C")),
+        openrac::UiItem::text(words("Strafe      Shift", "Pas latéral  Maj", "Seitwärts    Umschalt", "Lateral      Mayús", "Laterale     Maiusc")),
+        openrac::UiItem::text(words("First person V / Mouse 4", "1re personne V / Souris 4", "Ego-Ansicht  V / Maus 4", "1a persona   V / Ratón 4", "Prima pers.  V / Mouse 4")),
+        openrac::UiItem::text(words("Map         Tab / M", "Carte        Tab / M", "Karte        Tab / M", "Mapa         Tab / M", "Mappa        Tab / M")),
+        openrac::UiItem::text(words("Weapons     1-8 / Wheel", "Armes        1-8 / Molette", "Waffen       1-8 / Mausrad", "Armas        1-8 / Rueda", "Armi         1-8 / Rotella")),
+        openrac::UiItem::text(words("Pause / Back Esc / P", "Pause/Retour Échap / P", "Pause/Zurück Esc / P", "Pausa/Atrás  Esc / P", "Pausa/Indietro Esc / P"))
+    };
+    content.footer = {
+        g->pc_layout
+            ? words("PC layout active; gamepad stays active", "Disposition PC active; manette active", "PC-Layout aktiv; Gamepad bleibt aktiv", "Diseño PC activo; mando activo", "Layout PC attivo; gamepad attivo")
+            : words("Enable PC layout in the mod settings", "Activer la disposition PC dans le mod", "PC-Layout in den Mod-Einstellungen aktivieren", "Activa el diseño PC en los ajustes", "Attiva il layout PC nelle impostazioni")
+    };
+    g->pc_page.set(content);
 }
 
 void save_controls() {
@@ -216,6 +253,12 @@ void add_camera_page(openrac::Mod& mod) {
     if (!mod.has_ui() || !mod.has_pause_items()) {
         return;
     }
+    g->pc_page = mod.ui_page([](const auto&, const openrac::UiEvent& event) {
+        if (!event.is(OPENRAC_UI_HIDE)) {
+            show_pc_layout();
+        }
+    });
+    show_pc_layout();
     g->page = mod.ui_page([](const auto&, const openrac::UiEvent& event) {
         bool changed = false;
         if (event.is(OPENRAC_UI_CHANGE) && event.item() == 0 && event.value() >= 0
@@ -229,6 +272,8 @@ void add_camera_page(openrac::Mod& mod) {
             const int wanted = std::clamp(g->controller_level + event.value() - 1, 1, 100);
             changed = wanted != g->controller_level;
             g->controller_level = wanted;
+        } else if (event.is(OPENRAC_UI_CHOOSE) && event.item() == 3) {
+            g->pc_page.open();
         }
         if (changed) {
             save_controls();
@@ -389,6 +434,151 @@ void write(uint32_t p, T v) {
     g->mod->memory().write<T>(p, v);
 }
 
+kbm::Context pc_context(int* dialog_kind) {
+    const int level = g->mod->loaded_level();
+    const int level_mode =
+        level >= 0 ? read<int32_t>(g->mod->relocate_level(0, g->disc->level_mode)) : -1;
+    const int boot_mode = level < 0 ? read<int32_t>(g->disc->boot_mode) : -1;
+    const auto context = kbm::context_of(level, level_mode, boot_mode);
+    *dialog_kind = context == kbm::Context::Dialog
+        ? read<int32_t>(g->mod->relocate(g->disc->dialog))
+        : -1;
+    return context;
+}
+
+bool pc_action(const openrac_input& in, kbm::Context context, kbm::Action action, bool pressed) {
+    if (!g->pc_layout || !in.focused || in.overlay) {
+        return false;
+    }
+    const auto& info = kbm::kActions[static_cast<std::size_t>(action)];
+    if (info.group == kbm::Group::Menu && context == kbm::Context::Play) {
+        return false;
+    }
+    for (int bind : g->pc_binds.of(action)) {
+        if (bind == 0) {
+            continue;
+        }
+        if (kbm::is_mouse(bind) && context == kbm::Context::Play && !in.captured) {
+            continue;
+        }
+        if (pressed ? openrac_bind_pressed(&in, bind)
+                    : (openrac_bind_held(&in, bind) || openrac_bind_pressed(&in, bind))) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void pc_take_item(int item) {
+    const uint32_t hero = g->mod->relocate(g->disc->hero);
+    if (item != 0 && valid(hero) && item != read<int32_t>(hero + KBM_HERO_ITEM)) {
+        write<int32_t>(hero + KBM_HERO_PENDING, item);
+    }
+}
+
+void pc_weapon_hotkeys(const openrac_input& in, kbm::Context context, bool ring_open) {
+    if (context != kbm::Context::Play || ring_open) {
+        return;
+    }
+    const uint32_t hero = g->mod->relocate(g->disc->hero);
+    if (!valid(hero) || read<uint8_t>(hero + KBM_HERO_VEHICLE) != 0) {
+        return;
+    }
+    std::array<int32_t, kbm::kQuickSelectSlots> slots{};
+    for (int i = 0; i < kbm::kQuickSelectSlots; ++i) {
+        slots[static_cast<std::size_t>(i)] =
+            read<int32_t>(g->disc->quick_select + static_cast<uint32_t>(i * 4));
+        const auto action =
+            static_cast<kbm::Action>(static_cast<int>(kbm::Action::Weapon1) + i);
+        if (pc_action(in, context, action, true)) {
+            pc_take_item(slots[static_cast<std::size_t>(i)]);
+            return;
+        }
+    }
+    const int step = pc_action(in, context, kbm::Action::WeaponNext, true) ? 1
+                   : pc_action(in, context, kbm::Action::WeaponPrev, true) ? -1 : 0;
+    if (step != 0) {
+        const int32_t pending = read<int32_t>(hero + KBM_HERO_PENDING);
+        const int32_t current = pending != 0 ? pending : read<int32_t>(hero + KBM_HERO_ITEM);
+        pc_take_item(kbm::cycle_item(slots, current, step));
+    }
+}
+
+void pc_layout_pad(uint8_t* report, int size, const openrac_input& in) {
+    if (!g->pc_layout || !g->enabled || !in.focused || in.overlay) {
+        g->pc_move = {};
+        g->pc_ring.reset();
+        g->pc_ring_open = false;
+        return;
+    }
+
+    if (g->pc_tick != in.tick) {
+        g->pc_tick = in.tick;
+        int dialog_kind = -1;
+        const auto context = pc_context(&dialog_kind);
+        kbm::ActionSet held = 0;
+        for (int i = 0; i < kbm::kActionCount; ++i) {
+            const auto action = static_cast<kbm::Action>(i);
+            if (pc_action(in, context, action, false)) {
+                held |= kbm::bit(action);
+            }
+        }
+        held = g->pc_latch.filter(context, held);
+        const auto on = [&](kbm::Action action) {
+            return (held & kbm::bit(action)) != 0;
+        };
+
+        g->pc_pad = {};
+        g->pc_pad.held = kbm::buttons_for(context, held, dialog_kind);
+
+        if (context == kbm::Context::Play) {
+            g->pc_move.step(
+                on(kbm::Action::MoveForward), on(kbm::Action::MoveBack),
+                on(kbm::Action::MoveLeft), on(kbm::Action::MoveRight),
+                on(kbm::Action::Walk), {0.5f, 4.0f}
+            );
+            g->pc_pad.left_x = g->pc_move.x;
+            g->pc_pad.left_y = g->pc_move.y;
+
+            const bool ring_open = on(kbm::Action::QuickSelect);
+            if (ring_open) {
+                g->pc_pad.held = static_cast<uint16_t>(g->pc_pad.held | kbm::kTriangle);
+                if (!g->pc_ring_open) {
+                    g->pc_ring.reset();
+                }
+                if (in.captured) {
+                    g->pc_ring.add(in.mouse_dx, in.mouse_dy, 30.0f);
+                    const auto stick = g->pc_ring.stick(30.0f);
+                    g->pc_pad.left_x = stick.first;
+                    g->pc_pad.left_y = stick.second;
+                }
+            } else if (g->pc_ring_open) {
+                g->pc_ring.reset();
+            }
+            g->pc_ring_open = ring_open;
+            pc_weapon_hotkeys(in, context, ring_open);
+        } else {
+            g->pc_move = {};
+            g->pc_ring.reset();
+            g->pc_ring_open = false;
+            if (on(kbm::Action::MoveForward) || on(kbm::Action::MenuUp)) {
+                g->pc_pad.held = static_cast<uint16_t>(g->pc_pad.held | kbm::kUp);
+            }
+            if (on(kbm::Action::MoveBack) || on(kbm::Action::MenuDown)) {
+                g->pc_pad.held = static_cast<uint16_t>(g->pc_pad.held | kbm::kDown);
+            }
+            if (on(kbm::Action::MoveLeft) || on(kbm::Action::MenuLeft)) {
+                g->pc_pad.held = static_cast<uint16_t>(g->pc_pad.held | kbm::kLeft);
+            }
+            if (on(kbm::Action::MoveRight) || on(kbm::Action::MenuRight)) {
+                g->pc_pad.held = static_cast<uint16_t>(g->pc_pad.held | kbm::kRight);
+            }
+        }
+    }
+
+    kbm::merge(g->pc_pad, report, size);
+}
+
 bool playing() {
     const auto& in = g->mod->input().raw();
     return g->enabled && in.focused && !in.overlay && g->mod->loaded_level() >= 0
@@ -459,11 +649,12 @@ void pad(int port, uint8_t* report, int size) {
     if (port != 0 || !report || size < 6) {
         return;
     }
+    const auto& in = g->mod->input().raw();
     g->active = playing();
-    if (g->mouse_enabled) {
+    if (g->mouse_enabled || g->pc_layout) {
         g->mod->capture_mouse(g->active);
     }
-    const auto& in = g->mod->input().raw();
+    pc_layout_pad(report, size, in);
     if (!g->active) {
         g->held = false;
         g->yaw = g->pitch = 0;
@@ -562,6 +753,13 @@ void load(openrac::Mod& mod) {
     g->disc = &k_kbm_discs[g->pal ? 0 : 1];
     g->enabled = mod.setting<bool>("enabled");
     g->mouse_enabled = mod.setting<bool>("mouse_enabled");
+    g->pc_layout = mod.setting<bool>("pc_layout");
+    for (int i = 0; i < kbm::kActionCount; ++i) {
+        kbm::parse_binds(
+            kbm::kActions[static_cast<std::size_t>(i)].fallback,
+            g->pc_binds.binds[static_cast<std::size_t>(i)]
+        );
+    }
     auto setting = [&](const char* key, int lo, int hi) {
         return std::clamp(mod.setting<int64_t>(key), int64_t(lo), int64_t(hi));
     };
@@ -575,13 +773,15 @@ void load(openrac::Mod& mod) {
     g->aim_speed = setting("aim_speed", 25, 200);
     g->move_speed = setting("move_speed", 50, 200);
     add_camera_page(mod);
-    if (g->mouse_enabled) {
+    if (g->pc_layout) {
+        mod.take_input(OPENRAC_INPUT_KEYBOARD | OPENRAC_INPUT_MOUSE);
+    } else if (g->mouse_enabled) {
         mod.take_input(OPENRAC_INPUT_MOUSE);
     }
     mod.on_pad(pad);
     mod.on_frame([] {
         bool active = playing();
-        if (g->mouse_enabled) {
+        if (g->mouse_enabled || g->pc_layout) {
             g->mod->capture_mouse(active);
         }
         if (!active) {
@@ -620,11 +820,11 @@ void load(openrac::Mod& mod) {
     });
 }
 }  // namespace
-OPENRAC_MOD_CPP("modern-controls", "0.3.3", load)
+OPENRAC_MOD_CPP("modern-controls", "0.4.0", load)
 
 extern "C" OPENRAC_MOD_EXPORT void openrac_mod_unload() {
     if (g) {
-        if (g->mouse_enabled) {
+        if (g->mouse_enabled || g->pc_layout) {
             g->mod->capture_mouse(false);
         }
         g.reset();
