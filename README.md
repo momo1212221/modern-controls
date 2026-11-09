@@ -57,11 +57,11 @@ Works with Xbox, PlayStation, Steam Deck and other gamepads that OpenRAC maps to
 
 **Movement speed (%)** separately changes how fast Ratchet moves on foot, including analog walking. Start at 100%; 120% increases the target speed by 20%. It applies to on-foot movement regardless of whether its input came from a controller or keyboard. Movement speed, acceleration/braking and camera speed are independent. Other speed mods multiply with this setting, so keep one of the speed multipliers at 100% when combining them.
 
-The in-game camera slider takes effect immediately. Changes to other launcher settings take effect after restarting the game. No mouse is required for the controller improvements. Disable the mouse-camera setting for a controller-only configuration if you want the mouse left free.
+The in-game camera slider takes effect immediately. Changes to other launcher settings take effect after restarting the game. No mouse is required for the controller improvements. For a controller-only configuration with a free cursor, disable both **PC control layout** and **Mouse / gyro / trackpad camera**.
 
 ## Steam Deck Pack
 
-Keep the Steam Deck Pack enabled for its icons, but switch **Gyro / trackpad mouse camera** off in that pack. Modern Controls becomes the one mouse-camera provider. Its own mouse setting can be disabled for a stick-only setup. Do not combine it with Keyboard & Mouse; both control the camera.
+Keep the Steam Deck Pack enabled for its icons, but switch **Gyro / trackpad mouse camera** off in that pack. Modern Controls becomes the one mouse-camera provider. For a stick-only Deck setup, disable both Modern Controls' PC layout and mouse-camera settings. Do not combine it with Keyboard & Mouse; both own keyboard/mouse input.
 
 The Camera integration uses one native pause Options slot internally. The local OpenRAC build permits four slots across all mods. If all four are already occupied, Modern Controls leaves the original Camera page in place and logs a warning; free a slot to expose the integrated 1–100 camera control. With Multiplayer and the old Steam Deck mouse-only pack, disable that already-unused mouse pack and keep the separate icon mod. A current Steam Deck Pack can stay enabled if a slot is free; its own mouse camera must remain off.
 
