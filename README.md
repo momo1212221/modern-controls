@@ -27,6 +27,8 @@ Works with Xbox, PlayStation, Steam Deck and other gamepads that OpenRAC maps to
 
 **Movement speed (%)** separately changes how fast Ratchet moves on foot, including analog walking. Start at 100%; 120% increases the target speed by 20%. It applies to on-foot movement regardless of whether its input came from a controller or keyboard. Movement speed, acceleration/braking and camera speed are independent. Other speed mods multiply with this setting, so keep one of the speed multipliers at 100% when combining them.
 
+**Lock-Strafe (L2):** Hold **L2** while on foot to lock Ratchet's facing direction to the camera's forward direction (like *Ratchet & Clank: Going Commando*), allowing you to strafe sideways and walk backwards while keeping your aim forward.
+
 The in-game camera slider takes effect immediately. Changes to other launcher settings take effect after restarting the game. No mouse is required for the controller improvements. Disable the mouse-camera setting for a controller-only configuration if you want the mouse left free.
 
 ## Steam Deck Pack
