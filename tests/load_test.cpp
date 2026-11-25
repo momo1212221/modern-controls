@@ -32,18 +32,26 @@ float speed_up, speed_down, target_seen;
 uint32_t hero;
 int movement_setting = 100;
 bool replace_target = false;
-std::string failure, shown, title;
-openrac_ui_fn ui_callback;
-void* ui_user;
+std::string failure, shown, title, pc_title;
+openrac_ui_fn ui_callbacks[2]{};
+void* ui_users[2]{};
+int ui_page_count = 0;
+int opened_page = -1;
+uint32_t taken_input = 0;
 bool reject_pause = false;
 
-void ui_event(uint32_t kind, int item = -1, int value = 0) {
+void ui_event_page(int page, uint32_t kind, int item = -1, int value = 0) {
+    CHECK(page >= 0 && page < 2 && ui_callbacks[page]);
     openrac_ui_event event{};
     event.size = sizeof event;
     event.kind = kind;
     event.item = item;
     event.value = value;
-    ui_callback(ui_user, 0, &event);
+    ui_callbacks[page](ui_users[page], page, &event);
+}
+
+void ui_event(uint32_t kind, int item = -1, int value = 0) {
+    ui_event_page(1, kind, item, value);
 }
 
 template <class T>
@@ -155,7 +163,8 @@ int main(int argc, char** argv) {
             api.input = []() -> const openrac_input* {
                 return &input;
             };
-            api.take_input = [](openrac_mod*, uint32_t) {
+            api.take_input = [](openrac_mod*, uint32_t devices) {
+                taken_input |= devices;
                 return 0;
             };
             api.capture_mouse = [](openrac_mod*, int value) {
@@ -177,26 +186,42 @@ int main(int argc, char** argv) {
                 return 0;
             };
             api.ui_page = [](openrac_mod*, uint32_t, openrac_ui_fn fn, void* user) {
-                ui_callback = fn;
-                ui_user = user;
-                return 0;
+                const int page = ui_page_count++ % 2;
+                ui_callbacks[page] = fn;
+                ui_users[page] = user;
+                return page;
             };
-            api.ui_set = [](openrac_mod*, int, const openrac_ui_content* c) {
-                CHECK(c->item_count == 3);
+            api.ui_set = [](openrac_mod*, int page, const openrac_ui_content* c) {
+                if (page == 0) {
+                    CHECK(c->item_count == 12);
+                    CHECK(c->items[0].kind == OPENRAC_UI_TEXT);
+                    pc_title = c->title;
+                    return 0;
+                }
+                CHECK(page == 1);
+                CHECK(c->item_count == 4);
                 CHECK(c->items[0].choice_count == 2);
                 CHECK(c->items[1].choice_count == 2);
                 CHECK(c->items[2].choice_count == 3);
                 CHECK(c->items[2].choice == 1);
+                CHECK(c->items[3].kind == OPENRAC_UI_BUTTON);
                 title = c->title;
                 shown = c->items[2].choices[1];
+                return 0;
+            };
+            api.ui_open = [](openrac_mod*, int page) {
+                opened_page = page;
                 return 0;
             };
             api.ui_pause_item = [](openrac_mod*, const char* label, int) {
                 CHECK(std::string(label) == "Kamera");
                 return reject_pause ? OPENRAC_HOOK_UNKNOWN : 0;
             };
+            taken_input = 0;
             CHECK(load(&api, reinterpret_cast<openrac_mod*>(1)) == 0);
             CHECK(failure.empty());
+            CHECK((taken_input & (OPENRAC_INPUT_KEYBOARD | OPENRAC_INPUT_MOUSE))
+                  == (OPENRAC_INPUT_KEYBOARD | OPENRAC_INPUT_MOUSE));
             const uint32_t cameras = pal ? 0x166D80 : 0x166C80;
             constexpr uint32_t camera = 0x100000, state = 0x110000;
             at<uint32_t>(cameras + 0x180) = camera;
@@ -217,6 +242,21 @@ int main(int argc, char** argv) {
                 < .0001f
             );
             CHECK(report[4] == 128 && report[5] == 128);
+
+            // The integrated PC layout drives the left stick and face buttons without disabling
+            // the physical controller: W moves forward, Space jumps and left mouse fires.
+            input.keys[26] = OPENRAC_KEY_HELD;  // KeyW
+            input.keys[44] = OPENRAC_KEY_HELD;  // Space
+            input.mouse_held = OPENRAC_MOUSE_LEFT;
+            input.tick++;
+            report[0] = report[1] = 255;
+            report[2] = report[3] = report[4] = report[5] = 128;
+            pad(pad_user, 0, report, 6);
+            CHECK(report[5] < 128);
+            CHECK((report[1] & 0x60u) == 0);  // Circle + Cross held
+            input.keys[26] = input.keys[44] = 0;
+            input.mouse_held = 0;
+
             CHECK(at<V>(state).x == resolved_eye.x && at<V>(state).y == resolved_eye.y
                   && at<V>(state).z == resolved_eye.z);
             CHECK(
@@ -339,6 +379,11 @@ int main(int argc, char** argv) {
             ui_event(OPENRAC_UI_SHOW);
             CHECK(title == "Kamera");
             CHECK(shown.find("75/100") != std::string::npos);
+            opened_page = -1;
+            ui_event(OPENRAC_UI_CHOOSE, 3);
+            CHECK(opened_page == 0);
+            ui_event_page(0, OPENRAC_UI_SHOW);
+            CHECK(pc_title == "PC-Steuerung");
             ui_event(OPENRAC_UI_CHANGE, 2, 2);
             CHECK(shown.find("76/100") != std::string::npos);
             input.mouse_dy = 0;
