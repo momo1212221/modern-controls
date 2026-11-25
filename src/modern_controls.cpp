@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Camera vector operations and disc offsets shared with the keyboard-mouse mod.
+#include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <optional>
 #include <vector>
 #if defined(__APPLE__)
 #include <mach/mach.h>
@@ -396,6 +399,29 @@ bool playing() {
            && read<int32_t>(g->mod->relocate_level(0, g->disc->level_mode)) == 0;
 }
 
+inline constexpr float kFollowMinElevation = -0.35f;  // ~-20 deg: keep follow camera above flat ground
+inline constexpr float kFollowMaxDownStep = -0.10f;  // prevent a single tick from skipping floor collision
+
+std::optional<float> follow_camera_yaw() {
+    const auto block = g->mod->relocate_level(0, g->disc->cameras);
+    if (!valid(block)) {
+        return std::nullopt;
+    }
+    const auto camera = read<uint32_t>(block + KBM_CAMERAS_CURRENT);
+    if (!valid(camera) || read<int16_t>(camera + KBM_CAMERA_ID) != 0) {
+        return std::nullopt;
+    }
+    const auto state = read<uint32_t>(camera + KBM_CAMERA_STATE);
+    if (!valid(state)) {
+        return std::nullopt;
+    }
+    const auto orbit = read<V>(state + KBM_FOLLOW_ORBIT);
+    if (orbit.x == 0.f && orbit.y == 0.f) {
+        return std::nullopt;
+    }
+    return std::atan2(-orbit.y, -orbit.x);
+}
+
 void follow(uint32_t camera) {
     if (!playing() || !g->active || !valid(camera)) {
         g->held = false;
@@ -408,16 +434,6 @@ void follow(uint32_t camera) {
     }
     float yaw = g->yaw, pitch = g->pitch;
     g->yaw = g->pitch = 0;  // one application per game input tick
-    if (g->strafe) {
-        const auto hero = g->mod->relocate(g->disc->hero);
-        if (valid(hero) && read<uint8_t>(hero + KBM_HERO_VEHICLE) == 0) {
-            const auto orbit = read<V>(state + KBM_FOLLOW_ORBIT);
-            write<float>(hero + KBM_HERO_FACING, std::atan2(-orbit.y, -orbit.x));
-        }
-    }
-    if (yaw == 0 && pitch == 0 && !g->held) {
-        return;
-    }
     const auto locks = read<int32_t>(state + KBM_FOLLOW_LOCKS);
     const auto block = g->mod->relocate_level(0, g->disc->cameras);
     if (!valid(block)) {
@@ -426,39 +442,55 @@ void follow(uint32_t camera) {
     const auto up = kbm::unit_or(read<V>(block + KBM_CAMERAS_UP), kbm::kWorldUp);
     auto orbit = read<V>(state + KBM_FOLLOW_ORBIT);
     auto smooth = read<V>(state + KBM_FOLLOW_ORBIT_SMOOTH);
-    // KBM_FOLLOW_EYE is the previous collision-resolved camera position. Leave it to the
-    // game's collision solver; changing it here can make the next trace start behind geometry.
-    if (!(locks & 1) && yaw != 0) {
-        orbit = kbm::rotate(orbit, up, yaw);
-        smooth = kbm::rotate(smooth, up, yaw);
+    const bool floor_blocked = read<int16_t>(state + KBM_FOLLOW_GROUND_STOP) < 0;
+    const float current_elev = kbm::elevation(orbit, up);
+    if (g->held && (floor_blocked || (pitch >= 0.f && current_elev > g->tilt + 0.02f))) {
+        g->tilt = std::max(g->tilt, current_elev);
     }
-    if (locks & 2) {
-        g->held = false;
-    } else if (pitch != 0) {
-        if (!g->held) {
-            g->tilt = kbm::elevation(orbit, up);
+    if (yaw != 0 || pitch != 0 || g->held) {
+        // KBM_FOLLOW_EYE is the previous collision-resolved camera position. Leave it to the
+        // game's collision solver; changing it here can make the next trace start behind geometry.
+        if (!(locks & 1) && yaw != 0) {
+            orbit = kbm::rotate(orbit, up, yaw);
+            smooth = kbm::rotate(smooth, up, yaw);
         }
-        float now =
-            std::clamp(g->tilt + pitch, -kbm::follow_max_elevation(), kbm::follow_max_elevation());
-        float moved = now - g->tilt;
-        auto tilt = [&](V v) {
-            return kbm::with_elevation(
-                v, up, std::clamp(kbm::elevation(v, up) + moved, -1.5f, 1.5f)
-            );
-        };
-        orbit = tilt(orbit);
-        smooth = tilt(smooth);
-        g->tilt = now;
-        g->held = true;
+        if (locks & 2) {
+            g->held = false;
+        } else if (pitch != 0) {
+            if (!g->held) {
+                g->tilt = current_elev;
+            }
+            float step = pitch;
+            if (step < 0.f) {
+                step = floor_blocked ? 0.f : std::max(step, kFollowMaxDownStep);
+            }
+            float now = std::clamp(g->tilt + step, kFollowMinElevation, kbm::follow_max_elevation());
+            float moved = now - g->tilt;
+            auto tilt = [&](V v) {
+                return kbm::with_elevation(
+                    v, up, std::clamp(kbm::elevation(v, up) + moved, kFollowMinElevation, 1.5f)
+                );
+            };
+            orbit = tilt(orbit);
+            smooth = tilt(smooth);
+            g->tilt = now;
+            g->held = true;
+        }
+        write(state + KBM_FOLLOW_ORBIT, orbit);
+        write(state + KBM_FOLLOW_ORBIT_SMOOTH, smooth);
+        if (g->held) {
+            float w = kbm::follow_target_of(g->tilt);
+            write(state + KBM_FOLLOW_TILT, w);
+            write(state + KBM_FOLLOW_TILT_RATE, 0.f);
+            bool invert = read<int32_t>(g->mod->relocate(g->disc->tilt_invert)) != 0;
+            write(g->mod->relocate(g->disc->pad_sticks) + 4, kbm::follow_stick_for(w, invert));
+        }
     }
-    write(state + KBM_FOLLOW_ORBIT, orbit);
-    write(state + KBM_FOLLOW_ORBIT_SMOOTH, smooth);
-    if (g->held) {
-        float w = kbm::follow_target_of(g->tilt);
-        write(state + KBM_FOLLOW_TILT, w);
-        write(state + KBM_FOLLOW_TILT_RATE, 0.f);
-        bool invert = read<int32_t>(g->mod->relocate(g->disc->tilt_invert)) != 0;
-        write(g->mod->relocate(g->disc->pad_sticks) + 4, kbm::follow_stick_for(w, invert));
+    if (g->strafe && (orbit.x != 0.f || orbit.y != 0.f)) {
+        const auto hero = g->mod->relocate(g->disc->hero);
+        if (valid(hero) && read<uint8_t>(hero + KBM_HERO_VEHICLE) == 0) {
+            write<float>(hero + KBM_HERO_FACING, std::atan2(-orbit.y, -orbit.x));
+        }
     }
 }
 
@@ -477,7 +509,11 @@ void pad(int port, uint8_t* report, int size) {
         g->yaw = g->pitch = 0;
         return;
     }
-    g->strafe = (report[3] & 0x01u) == 0 && (report[2] != 0 || report[3] != 0);
+    // L2 is bit 0 of report[1] (active-low); ignore synthetic all-zero button bytes.
+    g->strafe = (report[1] & 0x01u) == 0 && (report[0] != 0 || report[1] != 0);
+    if (g->strafe) {
+        report[1] |= 0x01u;
+    }
     const auto block = g->mod->relocate_level(0, g->disc->cameras);
     if (!valid(block)) {
         g->held = false;
@@ -595,6 +631,7 @@ void load(openrac::Mod& mod) {
         }
         if (!active) {
             g->held = false;
+            g->strafe = false;
             g->yaw = g->pitch = 0;
         }
         integrate_camera_menu();
@@ -626,6 +663,38 @@ void load(openrac::Mod& mod) {
         if (read<float>(address) == scaled) {
             write(address, target);
         }
+    });
+    mod.hook<openrac::rac1::Hero_TurnToHeading>(
+        [](auto original, int32_t mode, float accel, float damping, float limit) {
+            const auto hero = g->mod->relocate(g->disc->hero);
+            if (!playing() || !g->strafe || !valid(hero)
+                || read<uint8_t>(hero + KBM_HERO_VEHICLE) != 0) {
+                original(mode, accel, damping, limit);
+                return;
+            }
+            const auto yaw = follow_camera_yaw();
+            if (!yaw.has_value()) {
+                original(mode, accel, damping, limit);
+                return;
+            }
+            const auto move_addr = hero + KBM_HERO_MOVE_YAW;
+            const float saved_move_yaw = read<float>(move_addr);
+            write(move_addr, *yaw);
+            original(mode, accel, damping, limit);
+            write(move_addr, saved_move_yaw);
+        }
+    );
+    mod.hook<openrac::rac1::Hero_SetPlanarVelocity>([](auto original, float angle) {
+        const auto hero = g->mod->relocate(g->disc->hero);
+        if (playing() && g->strafe && valid(hero) && read<uint8_t>(hero + KBM_HERO_VEHICLE) == 0
+            && angle > 3.14159265f) {
+            const float move_yaw = read<float>(hero + KBM_HERO_MOVE_YAW);
+            if (std::isfinite(move_yaw)) {
+                original(move_yaw);
+                return;
+            }
+        }
+        original(angle);
     });
 }
 }  // namespace

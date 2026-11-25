@@ -15,7 +15,9 @@
   },
   "hooks": [
     "rac1.camera.follow.apply_overrides",
-    "rac1.player.approach_speed"
+    "rac1.player.approach_speed",
+    "rac1.player.turn_to_heading",
+    "rac1.player.set_planar_velocity"
   ],
   "settings": [
     {

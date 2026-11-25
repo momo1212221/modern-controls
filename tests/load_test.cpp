@@ -27,8 +27,10 @@ openrac_frame_fn frame;
 void* frame_user;
 void (*camera_hook)(uint32_t);
 void (*speed_hook)(float, float);
+void (*turn_hook)(int32_t, float, float, float);
+void (*velocity_hook)(float);
 int phase = OPENRAC_PLAY_PLAYING;
-float speed_up, speed_down, target_seen;
+float speed_up, speed_down, target_seen, turn_move_yaw_seen, velocity_angle_seen;
 uint32_t hero;
 int movement_setting = 100;
 bool replace_target = false;
@@ -66,6 +68,14 @@ void speed_original(float up, float down) {
     }
 }
 
+void turn_original(int32_t, float, float, float) {
+    turn_move_yaw_seen = at<float>(hero + 0x180);
+}
+
+void velocity_original(float angle) {
+    velocity_angle_seen = angle;
+}
+
 int hook(openrac_mod*, const char* id, const char*, void* fn, void** original) {
     if (std::strcmp(id, "rac1.camera.follow.apply_overrides") == 0) {
         camera_hook = reinterpret_cast<decltype(camera_hook)>(fn);
@@ -73,6 +83,12 @@ int hook(openrac_mod*, const char* id, const char*, void* fn, void** original) {
     } else if (std::strcmp(id, "rac1.player.approach_speed") == 0) {
         speed_hook = reinterpret_cast<decltype(speed_hook)>(fn);
         *original = reinterpret_cast<void*>(speed_original);
+    } else if (std::strcmp(id, "rac1.player.turn_to_heading") == 0) {
+        turn_hook = reinterpret_cast<decltype(turn_hook)>(fn);
+        *original = reinterpret_cast<void*>(turn_original);
+    } else if (std::strcmp(id, "rac1.player.set_planar_velocity") == 0) {
+        velocity_hook = reinterpret_cast<decltype(velocity_hook)>(fn);
+        *original = reinterpret_cast<void*>(velocity_original);
     } else {
         return OPENRAC_HOOK_UNKNOWN;
     }
@@ -275,6 +291,51 @@ int main(int argc, char** argv) {
                 && at<V>(state + 0x130).z == locked.z
             );
             at<int32_t>(state + 0x1b8) = 0;
+            // Floor collision stop (< 0 at state + 0x208) and downward pitch limit prevent clipping under the ground.
+            at<V>(state + 0x130) = {4, 0, -0.5f};
+            at<V>(state + 0x140) = {4, 0, -0.5f};
+            at<int16_t>(state + 0x208) = -1;
+            input.mouse_dx = 0;
+            input.mouse_dy = -100;
+            input.tick++;
+            pad(pad_user, 0, report, 6);
+            camera_hook(camera);
+            CHECK(at<V>(state + 0x130).z >= -0.501f);
+            at<int16_t>(state + 0x208) = 0;
+            for (int n = 0; n < 30; ++n) {
+                input.mouse_dy = -500;
+                input.tick++;
+                pad(pad_user, 0, report, 6);
+                camera_hook(camera);
+            }
+            CHECK(
+                std::asin(at<V>(state + 0x130).z / 4.031129f) >= -0.36f
+            );
+            // RaC2-style lock-strafe on L2 (report[1] bit 0 active-low): turns to camera and moves along move_yaw.
+            at<V>(state + 0x130) = {-4, 0, 0};  // camera behind hero looking +X (yaw = 0)
+            at<float>(hero + 0x98) = 1.2f;
+            at<float>(hero + 0x180) = 1.57f;
+            report[0] = 255;
+            report[1] = 254;  // L2 pressed
+            report[2] = 128;
+            report[3] = 128;
+            input.mouse_dx = 0;
+            input.mouse_dy = 0;
+            input.tick++;
+            pad(pad_user, 0, report, 6);
+            CHECK((report[1] & 0x01u) == 1u);
+            turn_hook(0, 0.1f, 0.2f, 0.3f);
+            CHECK(std::abs(turn_move_yaw_seen) < 0.001f);
+            CHECK(std::abs(at<float>(hero + 0x180) - 1.57f) < 0.001f);
+            velocity_hook(4.0f);
+            CHECK(std::abs(velocity_angle_seen - 1.57f) < 0.001f);
+            camera_hook(camera);
+            CHECK(std::abs(at<float>(hero + 0x98)) < 0.001f);
+            report[1] = 255;
+            input.tick++;
+            pad(pad_user, 0, report, 6);
+            velocity_hook(4.0f);
+            CHECK(std::abs(velocity_angle_seen - 4.0f) < 0.001f);
             // Menus and lost focus leave physical reports and acceleration unchanged.
             phase = OPENRAC_PLAY_MENU;
             input.tick++;

@@ -96,11 +96,13 @@ typedef struct kbm_disc {
 #define KBM_FOLLOW_TILT 0x1B0u
 #define KBM_FOLLOW_TILT_RATE 0x1B4u
 #define KBM_FOLLOW_LOCKS 0x1B8u
+#define KBM_FOLLOW_GROUND_STOP 0x208u /* s16: < 0 when floor collision stops downward pitch */
 /* The first-person view's state: how far it looks down (radians). */
 #define KBM_FIRST_PERSON_TILT 0x10u
 
 /* In the hero, on both discs. */
 #define KBM_HERO_FACING 0x98u    /* f32: the way he faces (rot.z) */
+#define KBM_HERO_MOVE_YAW 0x180u /* f32: stick movement direction in world yaw */
 #define KBM_HERO_ITEM 0x10B8u    /* i32: the item in hand (items[0].item_id) */
 #define KBM_HERO_MOBY 0x2080u    /* u32: his moby; +0xE0 his up (the first person's turn's axis) */
 #define KBM_HERO_VEHICLE 0x20A4u /* u8: 0 on foot */

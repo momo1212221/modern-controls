@@ -1,5 +1,7 @@
 # Modern Controls (experimental)
 
+![Modern Controls in-game Camera menu](assets/camera-menu.jpg)
+
 A separate RAC1 PAL / NTSC-U mod for a quicker, more adjustable camera and movement response.
 
 The mod integrates directly into **Pause → Options → Kamera**. There is only one camera entry: the original RAC1 Kamera page is removed and replaced by the Modern Controls page. The replacement Kamera page keeps the two inversion controls and replaces the original Slow/Medium/Fast **camera rotation speed** row with the Modern Controls **1–100** adjustment. Use Left/Right for exact one-step changes; the bar shows the current number. Changes affect the next gameplay input tick and are saved for the next launch.
@@ -41,7 +43,7 @@ The fine adjustment is saved in `controls.ini` in the SDK's per-mod data directo
 
 ## Development and verification
 
-Uses the SDK's stable `rac1.camera.follow.apply_overrides` and `rac1.player.approach_speed` hooks. Camera math and disc layouts are reused from `keyboard-mouse/src/kbm.hpp` and `discs.h`, under the repository's GPL-3.0-or-later license. Build through the root CMake project with SDK 1.9 or newer.
+Uses the SDK's stable `rac1.camera.follow.apply_overrides`, `rac1.player.approach_speed`, `rac1.player.turn_to_heading` and `rac1.player.set_planar_velocity` hooks. Camera math and disc layouts are reused from `keyboard-mouse/src/kbm.hpp` and `discs.h`, under the repository's GPL-3.0-or-later license. Build through the root CMake project with SDK 1.9 or newer.
 
 Tests cover radial deadzone boundaries, diagonal magnitude, mouse scaling, 60 Hz game-tick normalization (both OpenRAC disc builds), and camera vector length. A native-library host test exercises both discs on synthetic game RAM with interface 1.10: camera and first-person movement, duplicate polls, pitch bounds, movement speed/restoration, controller-only turn and aim scaling, vehicle passthrough, movement response, menus, focus loss, weapon selection and special-camera passthrough. Tests also exercise all 100 slider positions, endpoint clamping, live rate changes, language selection, preference reload on interface 1.10, and graceful handling of occupied Options slots. No game assets are included.
 
