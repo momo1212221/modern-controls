@@ -28,7 +28,7 @@ struct State {
     const kbm_disc* disc;
     bool enabled, mouse_enabled, pal;
     int mx, my, sx, sy, deadzone, response, controller_level, aim_speed, move_speed;
-    bool active = false, held = false, seen = false;
+    bool active = false, held = false, seen = false, strafe = false;
     uint32_t tick = 0;
     float yaw = 0, pitch = 0, tilt = 0;
     openrac::UiPage page;
@@ -408,6 +408,13 @@ void follow(uint32_t camera) {
     }
     float yaw = g->yaw, pitch = g->pitch;
     g->yaw = g->pitch = 0;  // one application per game input tick
+    if (g->strafe) {
+        const auto hero = g->mod->relocate(g->disc->hero);
+        if (valid(hero) && read<uint8_t>(hero + KBM_HERO_VEHICLE) == 0) {
+            const auto orbit = read<V>(state + KBM_FOLLOW_ORBIT);
+            write<float>(hero + KBM_HERO_FACING, std::atan2(-orbit.y, -orbit.x));
+        }
+    }
     if (yaw == 0 && pitch == 0 && !g->held) {
         return;
     }
@@ -466,9 +473,11 @@ void pad(int port, uint8_t* report, int size) {
     const auto& in = g->mod->input().raw();
     if (!g->active) {
         g->held = false;
+        g->strafe = false;
         g->yaw = g->pitch = 0;
         return;
     }
+    g->strafe = (report[3] & 0x01u) == 0 && (report[2] != 0 || report[3] != 0);
     const auto block = g->mod->relocate_level(0, g->disc->cameras);
     if (!valid(block)) {
         g->held = false;
