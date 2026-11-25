@@ -29,15 +29,20 @@ Works with Xbox, PlayStation, Steam Deck and other gamepads that OpenRAC maps to
 
 **Movement speed (%)** separately changes how fast Ratchet moves on foot, including analog walking. Start at 100%; 120% increases the target speed by 20%. It applies to on-foot movement regardless of whether its input came from a controller or keyboard. Movement speed, acceleration/braking and camera speed are independent. Other speed mods multiply with this setting, so keep one of the speed multipliers at 100% when combining them.
 
-**Lock-Strafe (L2):** Hold **L2** while on foot to lock Ratchet's facing direction to the camera's forward direction (like *Ratchet & Clank: Going Commando*), allowing you to strafe sideways and walk backwards while keeping your aim forward.
+**Lock-Strafe (L2 / LT):** Hold **L2** (or **R2 / LT / RT**, configurable under **Strafe button**) while on foot to lock Ratchet's facing direction to the camera's forward direction (like *Ratchet & Clank: Going Commando*), allowing you to strafe sideways and walk backwards while keeping your aim forward.
 
 The in-game camera slider takes effect immediately. Changes to other launcher settings take effect after restarting the game. No mouse is required for the controller improvements. Disable the mouse-camera setting for a controller-only configuration if you want the mouse left free.
 
-## Steam Deck Pack
+## Compatibility with Steam Deck, Xbox, DualSense, Button Swap & PC layouts
 
-Keep the Steam Deck Pack enabled for its icons, but switch **Gyro / trackpad mouse camera** off in that pack. Modern Controls becomes the one mouse-camera provider. Its own mouse setting can be disabled for a stick-only setup. Do not combine it with Keyboard & Mouse; both control the camera.
+Modern Controls is declared as a `"multiplayer": "input"` mod with load-order rules (`load.after`) so it runs **after** layout and input mods and works cleanly alongside them:
 
-The Camera integration uses one native pause Options slot internally. The local OpenRAC build permits four slots across all mods. If all four are already occupied, Modern Controls leaves the original Camera page in place and logs a warning; free a slot to expose the integrated 1–100 camera control. With Multiplayer and the old Steam Deck mouse-only pack, disable that already-unused mouse pack and keep the separate icon mod. A current Steam Deck Pack can stay enabled if a slot is free; its own mouse camera must remain off.
+* **PC (`keyboard-mouse`):** Can be enabled together without conflict. Modern Controls automatically yields direct mouse-camera control and `capture_mouse` to Keyboard & Mouse while keeping controller camera tuning, movement speed, acceleration/braking, the 1–100 Kamera menu, and L2 lock-strafe (including `ShiftLeft` mapped to L2).
+* **Steam Deck (`steam-deck-pack`):** Works together with Steam Deck button icons and gyro/trackpad camera. When Steam Deck Pack's gyro/trackpad camera is on, Modern Controls reads its right-stick output instead of double-reading raw mouse deltas.
+* **Xbox (`xbox-icons`) & DualSense (`dualsense`) & `button-swap`:** Button prompts remain untouched; remapped buttons and paddles are read cleanly after those mods run.
+* **Lock-strafe (`lock-strafe`):** If the standalone Lock-strafe mod is enabled (or `strafe_button` is set to `off`), Modern Controls automatically yields strafe control to avoid duplicate hooks.
+
+The Camera integration uses one native pause Options slot internally. The local OpenRAC build permits four slots across all mods. If all four are already occupied, Modern Controls leaves the original Camera page in place and logs a warning; free a slot to expose the integrated 1–100 camera control.
 
 The fine adjustment is saved in `controls.ini` in the SDK's per-mod data directory on interface 1.11+, or beside this library on older runtimes (including 1.10). Only this mod's own preference is written. A read-only mod directory still allows live adjustment, but the page reports when it cannot save. The saved in-game camera level takes precedence over the launcher default; remove that file to use the launcher's level again. Existing 0.2.0 launcher camera percentages should be migrated to the closest new level (100% → 50, 200% → 75, 300% → 100).
 

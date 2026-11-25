@@ -7,10 +7,20 @@
   "description": "Direct mouse and controller camera with adjustable turn and aim speed, separate axis sensitivity, radial deadzone, movement speed, acceleration/braking, and RaC2-style L2 lock-strafe.",
   "license": "GPL-3.0-or-later",
   "api": "1.9",
+  "multiplayer": "input",
   "games": {
     "rac1": [
       "pal",
       "ntsc"
+    ]
+  },
+  "load": {
+    "after": [
+      "keyboard-mouse",
+      "steam-deck-pack",
+      "dualsense",
+      "button-swap",
+      "xbox-icons"
     ]
   },
   "hooks": [
@@ -115,12 +125,31 @@
       "max": 200,
       "step": 10,
       "description": "On-foot target speed, independent of camera speed and acceleration. 100% preserves the original run speed."
-    }
-  ],
-  "conflicts": [
+    },
     {
-      "id": "keyboard-mouse",
-      "reason": "Both mods control the mouse camera."
+      "key": "strafe_button",
+      "name": "Strafe button (RaC2 lock-strafe)",
+      "type": "choice",
+      "default": "l2",
+      "choices": [
+        {
+          "value": "l2",
+          "name": "L2 / LT"
+        },
+        {
+          "value": "r2",
+          "name": "R2 / RT"
+        },
+        {
+          "value": "both",
+          "name": "L2 or R2 (LT or RT)"
+        },
+        {
+          "value": "off",
+          "name": "Off (use another strafe mod)"
+        }
+      ],
+      "description": "Button held on foot to face the camera and strafe like Going Commando. Automatically yields if the standalone Lock-strafe mod is enabled."
     }
   ]
 }

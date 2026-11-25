@@ -32,6 +32,8 @@ struct State {
     bool enabled, mouse_enabled, pal;
     int mx, my, sx, sy, deadzone, response, controller_level, aim_speed, move_speed;
     bool active = false, held = false, seen = false, strafe = false;
+    uint8_t strafe_mask = 0x01u;
+    int capture = -1;
     uint32_t tick = 0;
     float yaw = 0, pitch = 0, tilt = 0;
     openrac::UiPage page;
@@ -494,14 +496,77 @@ void follow(uint32_t camera) {
     }
 }
 
+void update_capture(bool wanted) {
+    if (!g->mouse_enabled) {
+        return;
+    }
+    if (g->capture != static_cast<int>(wanted) || (wanted && !g->mod->input().captured())) {
+        g->capture = wanted ? 1 : 0;
+        g->mod->capture_mouse(wanted);
+    }
+}
+
+std::string read_choice(openrac::Mod& mod, const char* key, const char* fallback) {
+    if (mod.api().setting_string == nullptr) {
+        return fallback;
+    }
+    const auto value = mod.setting<std::string>(key);
+    return value.empty() ? std::string(fallback) : value;
+}
+
+uint8_t parse_strafe_mask(const std::string& choice) {
+    if (choice == "off") {
+        return 0u;
+    }
+    if (choice == "r2") {
+        return 0x02u;
+    }
+    if (choice == "both") {
+        return 0x03u;
+    }
+    return 0x01u;
+}
+
+void detect_layout_peers(openrac::Mod& mod) {
+    if (!mod.has_party_rules() || mod.api().mod_count == nullptr || mod.api().mod_entry == nullptr
+        || mod.api().mod_setting == nullptr) {
+        return;
+    }
+    for (const auto& entry : mod.mods()) {
+        if (entry.id == "keyboard-mouse") {
+            if (g->mouse_enabled) {
+                g->mouse_enabled = false;
+                mod.info("Modern Controls: Keyboard and mouse detected; yielding mouse camera");
+            }
+        } else if (entry.id == "steam-deck-pack") {
+            bool deck_camera = true;
+            for (const auto& s : mod.mod_settings(entry.index)) {
+                if (s.key == "enabled") {
+                    deck_camera = (s.value == "true" || s.value == "1");
+                    break;
+                }
+            }
+            if (deck_camera && g->mouse_enabled) {
+                g->mouse_enabled = false;
+                mod.info(
+                    "Modern Controls: Steam Deck Pack mouse camera active; reading its stick output"
+                );
+            }
+        } else if (entry.id == "lock-strafe") {
+            if (g->strafe_mask != 0u) {
+                g->strafe_mask = 0u;
+                mod.info("Modern Controls: Lock-strafe detected; yielding strafe control");
+            }
+        }
+    }
+}
+
 void pad(int port, uint8_t* report, int size) {
     if (port != 0 || !report || size < 6) {
         return;
     }
     g->active = playing();
-    if (g->mouse_enabled) {
-        g->mod->capture_mouse(g->active);
-    }
+    update_capture(g->active);
     const auto& in = g->mod->input().raw();
     if (!g->active) {
         g->held = false;
@@ -509,10 +574,21 @@ void pad(int port, uint8_t* report, int size) {
         g->yaw = g->pitch = 0;
         return;
     }
-    // L2 is bit 0 of report[1] (active-low); ignore synthetic all-zero button bytes.
-    g->strafe = (report[1] & 0x01u) == 0 && (report[0] != 0 || report[1] != 0);
+    // L2 (0x01) / R2 (0x02) in report[1] are active-low; ignore synthetic all-zero button bytes.
+    const uint8_t pressed_strafe = (report[0] != 0 || report[1] != 0)
+                                       ? static_cast<uint8_t>((~report[1]) & g->strafe_mask)
+                                       : 0u;
+    g->strafe = pressed_strafe != 0u;
     if (g->strafe) {
-        report[1] |= 0x01u;
+        report[1] |= g->strafe_mask;
+        if (size >= 18) {
+            if (pressed_strafe & 0x01u) {
+                report[16] = 0;
+            }
+            if (pressed_strafe & 0x02u) {
+                report[17] = 0;
+            }
+        }
     }
     const auto block = g->mod->relocate_level(0, g->disc->cameras);
     if (!valid(block)) {
@@ -619,6 +695,8 @@ void load(openrac::Mod& mod) {
     g->controller_level = setting("controller_level", 1, 100);
     g->aim_speed = setting("aim_speed", 25, 200);
     g->move_speed = setting("move_speed", 50, 200);
+    g->strafe_mask = parse_strafe_mask(read_choice(mod, "strafe_button", "l2"));
+    detect_layout_peers(mod);
     add_camera_page(mod);
     if (g->mouse_enabled) {
         mod.take_input(OPENRAC_INPUT_MOUSE);
@@ -626,9 +704,7 @@ void load(openrac::Mod& mod) {
     mod.on_pad(pad);
     mod.on_frame([] {
         bool active = playing();
-        if (g->mouse_enabled) {
-            g->mod->capture_mouse(active);
-        }
+        update_capture(active);
         if (!active) {
             g->held = false;
             g->strafe = false;

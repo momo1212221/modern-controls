@@ -442,6 +442,142 @@ int main(int argc, char** argv) {
             phase = OPENRAC_PLAY_PLAYING;
         }
     }
+    // Interface 1.14: layout peers (PC keyboard-mouse, Steam Deck Pack, Lock-strafe) and 18-byte pressure clearing.
+    {
+        hero = 0x13F450;
+        std::fill(memory.begin(), memory.end(), 0);
+        failure.clear();
+        input = {};
+        input.focused = 1;
+        input.captured = 1;
+        static int peer_mode = 0;
+        static const char* choice_value = "r2";
+        static bool took_mouse = false;
+        took_mouse = false;
+        openrac_api api14{};
+        api14.size = sizeof api14;
+        api14.api_major = 1;
+        api14.api_minor = 14;
+        api14.game = "rac1";
+        api14.version = "pal";
+        api14.memory = memory.data();
+        api14.log = [](openrac_mod*, int, const char*) {};
+        api14.fail = [](openrac_mod*, const char* msg) { failure = msg; };
+        api14.setting_bool = [](openrac_mod*, const char* key) -> int {
+            return std::strcmp(key, "invert_y") != 0;
+        };
+        api14.setting_int = [](openrac_mod*, const char*) -> int64_t { return 100; };
+        api14.setting_string = [](openrac_mod*, const char*) -> const char* { return choice_value; };
+        api14.hook = hook;
+        api14.relocate_data = [](uint32_t p) { return p; };
+        api14.relocate_level_data = [](int, uint32_t p) { return p; };
+        api14.loaded_level = []() { return 0; };
+        api14.input = []() -> const openrac_input* { return &input; };
+        api14.take_input = [](openrac_mod*, uint32_t flags) {
+            if (flags & OPENRAC_INPUT_MOUSE) {
+                took_mouse = true;
+            }
+            return 0;
+        };
+        api14.capture_mouse = [](openrac_mod*, int value) { input.captured = value; };
+        api14.on_pad = [](openrac_mod*, openrac_pad_fn f, void* u) {
+            pad = f;
+            pad_user = u;
+            return 0;
+        };
+        api14.on_frame = [](openrac_mod*, openrac_frame_fn f, void* u) {
+            frame = f;
+            frame_user = u;
+            return 0;
+        };
+        api14.play_status = [](openrac_play_status* s) {
+            s->phase = OPENRAC_PLAY_PLAYING;
+            s->level = 0;
+            return 0;
+        };
+        api14.data_dir = [](openrac_mod*) -> const char* { return nullptr; };
+        api14.ui_page = [](openrac_mod*, uint32_t, openrac_ui_fn, void*) { return 0; };
+        api14.ui_set = [](openrac_mod*, int, const openrac_ui_content*) { return 0; };
+        api14.ui_pause_item = [](openrac_mod*, const char*, int) { return 0; };
+        api14.mod_count = []() -> int { return peer_mode == 0 ? 1 : 2; };
+        api14.mod_entry = [](int index, openrac_mod_entry* out) -> int {
+            if (peer_mode == 0 && index == 0) {
+                out->id = "keyboard-mouse";
+                out->name = "Keyboard and mouse";
+                out->version = "1.2.6";
+                out->party = OPENRAC_PARTY_MOD_INPUT;
+                out->settings = 0;
+                return 0;
+            }
+            if (peer_mode == 1 && index == 0) {
+                out->id = "steam-deck-pack";
+                out->name = "Steam Deck Pack";
+                out->version = "0.3.0";
+                out->party = OPENRAC_PARTY_MOD_INPUT;
+                out->settings = 1;
+                return 0;
+            }
+            if (peer_mode == 1 && index == 1) {
+                out->id = "lock-strafe";
+                out->name = "Lock-strafe";
+                out->version = "1.2.2";
+                out->party = OPENRAC_PARTY_MOD_INPUT;
+                out->settings = 0;
+                return 0;
+            }
+            return OPENRAC_HOOK_UNKNOWN;
+        };
+        api14.mod_setting = [](int index, int setting, openrac_mod_setting* out) -> int {
+            if (peer_mode == 1 && index == 0 && setting == 0) {
+                out->key = "enabled";
+                out->name = "Gyro / trackpad mouse camera";
+                out->value = "true";
+                out->shown = "On";
+                return 0;
+            }
+            return OPENRAC_HOOK_UNKNOWN;
+        };
+
+        // Case 1: keyboard-mouse present -> yields mouse input, keeps R2 strafe + clears byte 17.
+        peer_mode = 0;
+        choice_value = "r2";
+        CHECK(load(&api14, reinterpret_cast<openrac_mod*>(1)) == 0);
+        CHECK(!took_mouse);
+        constexpr uint32_t camera = 0x100000, state = 0x110000;
+        at<uint32_t>(0x166D80 + 0x180) = camera;
+        at<V>(0x166D80 + 0x1b0) = {0, 0, 1};
+        at<uint32_t>(camera + 0x70) = state;
+        at<V>(state + 0x130) = {-4, 0, 0};
+        at<float>(hero + 0x180) = 0.75f;
+        uint8_t ds2[18] = {255, 253, 128, 128, 128, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255};
+        input.mouse_dx = 200;
+        input.tick++;
+        pad(pad_user, 0, ds2, 18);
+        CHECK((ds2[1] & 0x02u) == 0x02u);
+        CHECK(ds2[17] == 0);
+        camera_hook(camera);
+        CHECK(std::abs(at<V>(state + 0x130).y) < 0.001f);  // mouse did not double-turn
+        velocity_hook(4.0f);
+        CHECK(std::abs(velocity_angle_seen - 0.75f) < 0.001f);
+        unload();
+
+        // Case 2: steam-deck-pack (gyro active) + lock-strafe -> reads deck stick, yields strafe.
+        peer_mode = 1;
+        took_mouse = false;
+        CHECK(load(&api14, reinterpret_cast<openrac_mod*>(1)) == 0);
+        CHECK(!took_mouse);
+        uint8_t ds2_l2[18] = {255, 254, 200, 128, 128, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255, 0};
+        input.tick++;
+        pad(pad_user, 0, ds2_l2, 18);
+        CHECK((ds2_l2[1] & 0x01u) == 0u);  // L2 preserved for lock-strafe
+        CHECK(ds2_l2[16] == 255);
+        camera_hook(camera);
+        CHECK(std::abs(at<V>(state + 0x130).y) > 0.001f);  // stick from steam-deck-pack still works
+        velocity_hook(4.0f);
+        CHECK(std::abs(velocity_angle_seen - 4.0f) < 0.001f);
+        unload();
+        std::filesystem::remove(std::filesystem::path(directory) / "controls.ini");
+    }
     dlclose(lib);
     std::filesystem::remove_all(directory);
 }
