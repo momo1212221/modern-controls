@@ -629,7 +629,7 @@ void load(openrac::Mod& mod) {
     });
 }
 }  // namespace
-OPENRAC_MOD_CPP("modern-controls", "0.3.3", load)
+OPENRAC_MOD_CPP("modern-controls", "0.3.4", load)
 
 extern "C" OPENRAC_MOD_EXPORT void openrac_mod_unload() {
     if (g) {

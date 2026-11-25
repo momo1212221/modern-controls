@@ -2,9 +2,9 @@
   "format": 2,
   "id": "modern-controls",
   "name": "Modern Controls",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "author": "Moritz Wallinger",
-  "description": "Direct mouse and controller camera with adjustable turn and aim speed, separate axis sensitivity, radial deadzone, movement speed, and acceleration/braking.",
+  "description": "Direct mouse and controller camera with adjustable turn and aim speed, separate axis sensitivity, radial deadzone, movement speed, acceleration/braking, and RaC2-style L2 lock-strafe.",
   "license": "GPL-3.0-or-later",
   "api": "1.9",
   "games": {
