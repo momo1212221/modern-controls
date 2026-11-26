@@ -2,7 +2,7 @@
   "format": 2,
   "id": "modern-controls",
   "name": "Modern Controls",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "author": "Moritz Wallinger",
   "description": "Direct mouse and controller camera with adjustable turn and aim speed, separate axis sensitivity, radial deadzone, movement speed, acceleration/braking, and RaC2-style L2 lock-strafe.",
   "license": "GPL-3.0-or-later",
@@ -149,7 +149,7 @@
           "name": "Off (use another strafe mod)"
         }
       ],
-      "description": "Button held on foot to face the camera and strafe like Going Commando. Automatically yields if the standalone Lock-strafe mod is enabled."
+      "description": "Button held on foot to face the camera and strafe like Going Commando. Only enable for Ratchet & Clank 1 (Going Commando already has native lock-strafe). Automatically yields if the standalone Lock-strafe mod is enabled."
     }
   ]
 }
